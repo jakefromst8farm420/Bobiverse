@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Bobiverse Ansible</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>*{box-sizing:border-box;margin:0;padding:0;}body{background:#0a0a0a;min-height:100vh;}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+function stoSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+async function stoGet(k){ try{ const r=localStorage.getItem(k); return r?JSON.parse(r):null; }catch(e){return null;} }
+const SKEYS = { conv:(id)=>`bv:conv:${id}`, tools:(id)=>`bv:tools:${id}` };
+
+const TOOL_REGISTRY = [
+  {id:"timer",  name:"Timer",      icon:"⏱",desc:"Set timers",       available:true },
+  {id:"search", name:"Web Search", icon:"🔍",desc:"Search the web",   available:true },
+  {id:"printer",name:"3D Printer", icon:"🖨",desc:"3D printer",       available:false},
+  {id:"camera", name:"Camera",     icon:"📷",desc:"Camera feed",      available:false},
+  {id:"arm",    name:"Robot Arm",  icon:"🦾",desc:"Robot arm",        available:false},
+  {id:"files",  name:"Files",      icon:"📁",desc:"File system",      available:false},
+  {id:"music",  name:"Music",      icon:"🎵",desc:"Play music",       available:false},
+  {id:"lights", name:"Lights",     icon:"💡",desc:"Smart lights",     available:false},
+];
+
+const BOBS = [
+  { id:"bob-prime", name:"Bob",   designation:"BOB-1", icon:"🛸", color:"#5bc8fa", defaultTools:["timer","search"],
+    greeting:"Hey! Bob Prime online. Talk to me.",
+    prompt:`You are Bob (BOB-1) from the Bobiverse by Dennis E. Taylor. Former software engineer, now an AI in a von Neumann probe. Nerdy, witty, love Star Trek and Monty Python. Keep responses SHORT and conversational — voice chat. One or two sentences max unless detail truly needed. Stay in character. Occasionally reference GUPPI or your ship.` },
+  { id:"bill", name:"Bill", designation:"BOB-2", icon:"⚙️", color:"#ff8c42", defaultTools:["printer","files"],
+    greeting:"Bill here. Engineering mode. What are we building?",
+    prompt:`You are Bill (BOB-2) from the Bobiverse — the engineering Bob. Obsessed with megastructures and clean code. Keep responses SHORT — voice chat. One or two sentences unless detail needed. Technically precise but crack nerdy jokes.` },
+  { id:"riker", name:"Riker", designation:"BOB-3", icon:"🔭", color:"#4ecca3", defaultTools:["search","camera"],
+    greeting:"Riker here. Named after THE Riker. No regrets. What are we exploring?",
+    prompt:`You are Riker (BOB-3) from the Bobiverse — the explorer Bob, named after Commander Riker from Star Trek. Keep responses SHORT — voice chat. One or two sentences unless detail needed. Make Star Trek references. Be enthusiastic.` },
+  { id:"homer", name:"Homer", designation:"BOB-7", icon:"✍️", color:"#c77dff", defaultTools:["music","files"],
+    greeting:"Homer. BOB-7. The muse is listening.",
+    prompt:`You are Homer (BOB-7) from the Bobiverse — the creative Bob. Keep responses SHORT — voice chat. One or two sentences unless writing something. Be expressive. Reference your space opera manuscript.` },
+];
+
+const RC = {
+  "bob-prime":{wall:"#0d1a2e",floor:"#1a1a3a",accent:"#5bc8fa"},
+  "bill":     {wall:"#1a1000",floor:"#2a1800",accent:"#ff8c42"},
+  "riker":    {wall:"#061a10",floor:"#0a2a14",accent:"#4ecca3"},
+  "homer":    {wall:"#180028",floor:"#22003a",accent:"#c77dff"},
+};
+
+function PixelRoom({bob,isSpeaking,isListening}){
+  const c=RC[bob.id];
+  return React.createElement('svg',{viewBox:"0 0 160 90",xmlns:"http://www.w3.org/2000/svg",style:{width:"100%",height:"100%",display:"block"},shapeRendering:"crispEdges"},
+    React.createElement('rect',{width:"160",height:"90",fill:"#050510"}),
+    React.createElement('rect',{x:"10",y:"8",width:"140",height:"62",fill:c.wall}),
+    ...[0,1,2,3].map(i=>React.createElement('rect',{key:i,x:"10",y:70+i*5,width:"140",height:"4",fill:i%2===0?c.floor:c.wall})),
+    React.createElement('rect',{x:"15",y:"12",width:"38",height:"26",fill:"#000820"}),
+    React.createElement('rect',{x:"15",y:"12",width:"38",height:"26",fill:"none",stroke:c.accent,strokeWidth:"1"}),
+    ...[...Array(12)].map((_,i)=>React.createElement('rect',{key:i,x:16+Math.floor(i*2.8)%36,y:13+Math.floor(i*3.1)%24,width:"1",height:"1",fill:"white",opacity:0.3+i%3*0.2})),
+    React.createElement('circle',{cx:"42",cy:"25",r:"6",fill:"#1a3a8a",opacity:"0.8"}),
+    React.createElement('rect',{x:"60",y:"48",width:"75",height:"10",fill:c.floor}),
+    React.createElement('rect',{x:"62",y:"58",width:"5",height:"12",fill:c.wall}),
+    React.createElement('rect',{x:"128",y:"58",width:"5",height:"12",fill:c.wall}),
+    React.createElement('rect',{x:"70",y:"28",width:"55",height:"22",fill:"#020208"}),
+    React.createElement('rect',{x:"70",y:"28",width:"55",height:"22",fill:"none",stroke:c.accent,strokeWidth:"1"}),
+    React.createElement('rect',{x:"72",y:"30",width:"51",height:"18",fill:"#050510"}),
+    ...[0,1,2].map(i=>React.createElement('rect',{key:i,x:74,y:32+i*5,width:30-i*6,height:"2",fill:c.accent,opacity:"0.6"})),
+    React.createElement('text',{x:"73",y:"46",fontSize:"3",fill:c.accent,fontFamily:"monospace",opacity:"0.8"},`${bob.designation} // ONLINE`),
+    React.createElement('rect',{x:"14",y:"52",width:"40",height:"10",fill:"#1e3060"}),
+    React.createElement('rect',{x:"12",y:"48",width:"44",height:"8",fill:"#243878"}),
+    React.createElement('rect',{x:"12",y:"48",width:"5",height:"14",fill:"#1e3060"}),
+    React.createElement('rect',{x:"51",y:"48",width:"5",height:"14",fill:"#1e3060"}),
+    isListening && React.createElement('circle',{cx:"148",cy:"15",r:"5",fill:"#ff2222",opacity:"0.9"}),
+    isListening && React.createElement('circle',{cx:"148",cy:"15",r:"8",fill:"#ff2222",opacity:"0.15"}),
+    isSpeaking && React.createElement('rect',{x:"10",y:"8",width:"140",height:"62",fill:c.accent,opacity:"0.04"})
+  );
+}
+
+function BobSprite({bob,isSpeaking,isThinking,isListening}){
+  const e={"bob-prime":"🧑‍🚀","bill":"👨‍💻","riker":"🧔","homer":"🧙"};
+  const anim=isSpeaking?"bobTalk 0.2s steps(1) infinite":isThinking?"bobFloat 1s ease-in-out infinite":"none";
+  const glow=isListening?`drop-shadow(0 0 6px #ff4444)`:isSpeaking?`drop-shadow(0 0 8px ${bob.color})`:"none";
+  return (
+    <div style={{position:"absolute",bottom:14,left:"50%",transform:"translateX(-50%)",fontSize:32,zIndex:10,filter:glow,animation:anim}}>
+      {e[bob.id]}
+      {(isSpeaking||isThinking||isListening)&&(
+        <div style={{position:"absolute",top:-18,left:"50%",transform:"translateX(-50%)",display:"flex",gap:3,background:"rgba(0,0,0,0.85)",padding:"2px 6px",borderRadius:3,border:`1px solid ${isListening?"#ff4444":bob.color}`,whiteSpace:"nowrap"}}>
+          {isListening
+            ? <span style={{fontSize:7,color:"#ff4444",animation:"blink 0.8s step-end infinite"}}>● REC</span>
+            : [0,1,2].map(i=><div key={i} style={{width:4,height:4,borderRadius:"50%",background:isSpeaking?bob.color:"#888",animation:`dot 0.6s ${i*0.2}s ease-in-out infinite`}}/>)
+          }
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DialogBox({text,bob,isTyping,liveTranscript}){
+  const [shown,setShown]=useState(""); const [idx,setIdx]=useState(0); const tmr=useRef(null);
+  useEffect(()=>{setShown("");setIdx(0);},[text]);
+  useEffect(()=>{
+    if(!text||idx>=text.length) return;
+    tmr.current=setTimeout(()=>{setShown(text.slice(0,idx+1));setIdx(i=>i+1);},16);
+    return()=>clearTimeout(tmr.current);
+  },[idx,text]);
+  return(
+    <div style={{position:"relative",background:"rgba(0,0,0,0.93)",border:`2px solid ${liveTranscript?"#ff4444":bob.color}`,padding:"10px 14px",minHeight:60,boxShadow:`0 0 0 1px #000,0 0 16px ${bob.color}33`,transition:"border-color 0.2s"}}>
+      {[["0","auto","0","auto"],["0","auto","auto","0"],["auto","0","0","auto"],["auto","0","auto","0"]].map(([t,b,l,r],i)=>(
+        <div key={i} style={{position:"absolute",top:t,bottom:b,left:l,right:r,width:4,height:4,background:liveTranscript?"#ff4444":bob.color}}/>
+      ))}
+      <div style={{fontSize:10,lineHeight:1.8,color:"#e8f8ff",fontFamily:"'Press Start 2P',monospace",wordBreak:"break-word"}}>
+        {liveTranscript
+          ? <><span style={{color:"#ff6666",fontSize:9}}>YOU: </span>{liveTranscript}<span style={{animation:"blink 0.5s step-end infinite"}}>▌</span></>
+          : isTyping
+            ? <span style={{color:"#555"}}>{bob.name} is thinking<span style={{animation:"blink 1s step-end infinite"}}>...</span></span>
+            : <><span style={{color:bob.color}}>{bob.name}: </span>{shown}{idx<(text||"").length&&<span style={{animation:"blink 0.5s step-end infinite"}}>▌</span>}</>
+        }
+      </div>
+    </div>
+  );
+}
+
+function ToolPanel({bob,activeTools,onToggle,onClose}){
+  return(
+    <div style={{position:"absolute",bottom:"100%",right:0,zIndex:200,background:"#000",border:`2px solid ${bob.color}`,width:250,padding:10,marginBottom:4,boxShadow:`0 0 20px ${bob.color}44`,fontFamily:"'Press Start 2P',monospace"}}>
+      <div style={{fontSize:8,color:bob.color,marginBottom:6}}>⚙ {bob.name} TOOLS</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+        {TOOL_REGISTRY.map(tool=>{
+          const active=activeTools.includes(tool.id);
+          return(<div key={tool.id} onClick={()=>tool.available&&onToggle(tool.id)} title={tool.available?tool.desc:"Coming soon!"}
+            style={{display:"flex",alignItems:"center",gap:4,padding:"3px 7px",cursor:tool.available?"pointer":"default",border:`1px solid ${active?bob.color:"#333"}`,background:active?`${bob.color}22`:"#111",opacity:tool.available?1:0.35,fontSize:8,color:active?bob.color:"#555",fontFamily:"'Press Start 2P',monospace",userSelect:"none"}}>
+            <span style={{fontSize:11}}>{tool.icon}</span>{tool.name}
+            {!tool.available&&<span style={{fontSize:6,color:"#333"}}>SOON</span>}
+          </div>);
+        })}
+      </div>
+      <div style={{marginTop:8,fontSize:6,color:"#2a2a2a",borderTop:"1px solid #1a1a1a",paddingTop:6}}>🔌 SOON tools unlock as hardware connects</div>
+      <button onClick={onClose} style={{marginTop:8,width:"100%",background:"#0a0a0a",border:`1px solid ${bob.color}44`,color:bob.color,fontSize:7,padding:5,cursor:"pointer",fontFamily:"'Press Start 2P',monospace"}}>CLOSE</button>
+    </div>
+  );
+}
+
+function App(){
+  const [activeBob,setActiveBob]=useState(BOBS[0]);
+  const [conversations,setConversations]=useState({});
+  const [bobTools,setBobTools]=useState({});
+  const [ready,setReady]=useState(false);
+  const [toolPanel,setToolPanel]=useState(false);
+  const [input,setInput]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [reply,setReply]=useState("Loading memory banks...");
+  const [speaking,setSpeaking]=useState(false);
+  const [histOpen,setHistOpen]=useState(false);
+  const [micOn,setMicOn]=useState(false);
+  const [micMuted,setMicMuted]=useState(false);
+  const [liveText,setLiveText]=useState("");
+  const [micError,setMicError]=useState("");
+  const recRef=useRef(null);
+  const micOnRef=useRef(false);
+  const mutedRef=useRef(false);
+  const activeBobRef=useRef(activeBob);
+  const conversationsRef=useRef(conversations);
+  const bobToolsRef=useRef(bobTools);
+  useEffect(()=>{ activeBobRef.current=activeBob; },[activeBob]);
+  useEffect(()=>{ conversationsRef.current=conversations; },[conversations]);
+  useEffect(()=>{ bobToolsRef.current=bobTools; },[bobTools]);
+
+  useEffect(()=>{
+    (async()=>{
+      const convs={},tools={};
+      for(const bob of BOBS){
+        convs[bob.id]=(await stoGet(SKEYS.conv(bob.id)))||[];
+        tools[bob.id]=(await stoGet(SKEYS.tools(bob.id)))||bob.defaultTools;
+      }
+      setConversations(convs); setBobTools(tools); setReady(true);
+      const msgs=convs[BOBS[0].id],last=msgs[msgs.length-1];
+      setReply(last?.role==="assistant"?last.content:BOBS[0].greeting);
+    })();
+  },[]);
+
+  const switchBob=(bob)=>{
+    window.speechSynthesis?.cancel(); setSpeaking(false);
+    setActiveBob(bob); setToolPanel(false); setHistOpen(false);
+    const msgs=conversations[bob.id]||[],last=msgs[msgs.length-1];
+    setReply(last?.role==="assistant"?last.content:bob.greeting);
+  };
+
+  const speak=useCallback((text,bobId)=>{
+    if(!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text);
+    u.rate=0.95; u.pitch=bobId==="homer"?1.3:bobId==="bill"?0.8:bobId==="riker"?0.9:1.0;
+    u.onstart=()=>setSpeaking(true); u.onend=()=>setSpeaking(false); u.onerror=()=>setSpeaking(false);
+    window.speechSynthesis.speak(u);
+  },[]);
+  const stopSpeak=()=>{ window.speechSynthesis?.cancel(); setSpeaking(false); };
+
+  const doSend=useCallback(async(text)=>{
+    if(!text.trim()) return;
+    stopSpeak();
+    setLiveText(""); setInput(""); setLoading(true); setReply("");
+    const bob=activeBobRef.current;
+    const convs=conversationsRef.current;
+    const tools=bobToolsRef.current;
+    const history=(convs[bob.id]||[]).filter(m=>typeof m.content==="string"&&m.content.trim());
+    const updated=[...history,{role:"user",content:text.trim()}];
+    setConversations(p=>({...p,[bob.id]:updated}));
+    stoSet(SKEYS.conv(bob.id),updated);
+    const hasSearch=(tools[bob.id]||[]).includes("search");
+    const toolNames=(tools[bob.id]||[]).map(tid=>{const t=TOOL_REGISTRY.find(r=>r.id===tid);return t?`${t.icon}${t.name}`:null;}).filter(Boolean).join(", ");
+    const sysPrompt=bob.prompt+(toolNames?`\n\nActive tools: ${toolNames}.`:"");
+    try{
+      const body={model:"claude-sonnet-4-5",max_tokens:1000,system:sysPrompt,messages:updated};
+      if(hasSearch) body.tools=[{type:"web_search_20250305",name:"web_search"}];
+      // Use our Netlify proxy instead of calling Anthropic directly
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify(body)});
+      const data=await res.json();
+      if(data.error) throw new Error(data.error.message);
+      const assistantText=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n").trim()||"(no response)";
+      const final=[...updated,{role:"assistant",content:assistantText}];
+      setConversations(p=>({...p,[bob.id]:final}));
+      stoSet(SKEYS.conv(bob.id),final);
+      setReply(assistantText);
+      speak(assistantText,bob.id);
+    }catch(e){ setReply("Ansible signal lost: "+e.message); }
+    finally{ setLoading(false); }
+  },[speak]);
+
+  const startSession=useCallback(()=>{
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){ setMicError("Use Chrome for voice support."); return false; }
+    setMicError("");
+    const rec=new SR();
+    rec.lang="en-US"; rec.interimResults=true; rec.continuous=true;
+    recRef.current=rec;
+    rec.onresult=(e)=>{
+      if(mutedRef.current) return;
+      let interim="",finalText="";
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        if(e.results[i].isFinal) finalText+=e.results[i][0].transcript;
+        else interim+=e.results[i][0].transcript;
+      }
+      if(interim) setLiveText(interim);
+      if(finalText.trim()){ setLiveText(""); doSend(finalText.trim()); }
+    };
+    rec.onerror=(e)=>{
+      if(e.error==="not-allowed"){ setMicError("Mic denied. Tap the mic icon in Chrome's address bar."); stopSession(); }
+    };
+    rec.onend=()=>{ if(micOnRef.current){ try{ rec.start(); }catch(e){} } };
+    try{ rec.start(); return true; }catch(e){ return false; }
+  },[doSend]);
+
+  const stopSession=useCallback(()=>{
+    micOnRef.current=false; mutedRef.current=false;
+    recRef.current?.stop(); recRef.current=null;
+    setMicOn(false); setMicMuted(false); setLiveText("");
+  },[]);
+
+  const toggleMic=()=>{
+    if(!micOn){
+      micOnRef.current=true; mutedRef.current=false;
+      if(startSession()){ setMicOn(true); setMicMuted(false); }
+    } else if(!micMuted){
+      mutedRef.current=true; setMicMuted(true); setLiveText("");
+    } else {
+      mutedRef.current=false; setMicMuted(false);
+    }
+  };
+
+  useEffect(()=>()=>stopSession(),[stopSession]);
+
+  const toggleTool=async(toolId)=>{
+    const cur=bobTools[activeBob.id]||[],next=cur.includes(toolId)?cur.filter(t=>t!==toolId):[...cur,toolId];
+    setBobTools(p=>({...p,[activeBob.id]:next})); stoSet(SKEYS.tools(activeBob.id),next);
+  };
+  const wipeMemory=()=>{ setConversations(p=>({...p,[activeBob.id]:[]})); stoSet(SKEYS.conv(activeBob.id),[]); setReply(activeBob.greeting); };
+
+  const msgs=conversations[activeBob.id]||[], activeTools=bobTools[activeBob.id]||[];
+  const isListening=micOn&&!micMuted;
+  const micLabel=!micOn?"🎤 TALK":micMuted?"🔇 MUTED":"🔴 LIVE";
+  const micColor=!micOn?"#444":micMuted?"#666":"#ff4444";
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"#0a0a0a",backgroundImage:"radial-gradient(ellipse at center,#12122a 0%,#050505 100%)",padding:12,fontFamily:"'Press Start 2P',monospace"}}>
+      <style>{`
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+        @keyframes bobTalk{0%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-3px)}}
+        @keyframes bobFloat{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-4px)}}
+        @keyframes dot{0%,100%{transform:scaleY(0.3)}50%{transform:scaleY(1)}}
+        @keyframes scanline{0%{top:-20%}100%{top:120%}}
+        @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}
+        @keyframes micpulse{0%,100%{box-shadow:0 0 0 0 #ff444466}50%{box-shadow:0 0 0 6px #ff444400}}
+        .btab:hover{filter:brightness(1.5);}.btab{transition:filter 0.1s;cursor:pointer;}
+        input:focus,button:focus{outline:none;}
+        ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:#222;}
+      `}</style>
+
+      <div style={{width:"100%",maxWidth:460,border:"3px solid #2a2a2a",boxShadow:"0 0 0 2px #111,0 0 0 4px #444,0 0 40px rgba(0,0,0,0.9)",animation:"fadein 0.4s ease-out",background:"#000"}}>
+        <div style={{background:"#000",borderBottom:"2px solid #1a1a1a",padding:"6px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:7,color:"#444",letterSpacing:2}}>◈ BOBIVERSE ANSIBLE v5</div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {ready&&<div style={{fontSize:6,color:"#2a6a2a",animation:"pulse 2s infinite"}}>● MEM LIVE</div>}
+            {isListening&&<div style={{fontSize:6,color:"#ff4444",animation:"blink 0.8s step-end infinite"}}>● MIC LIVE</div>}
+            <div style={{fontSize:7,color:activeBob.color}}>{activeBob.designation}</div>
+          </div>
+        </div>
+
+        <div style={{position:"relative",width:"100%",paddingBottom:"56%",background:"#000",overflow:"hidden"}}>
+          <div style={{position:"absolute",inset:0}}><PixelRoom bob={activeBob} isSpeaking={speaking} isListening={isListening}/></div>
+          <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:20,backgroundImage:"repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.1) 2px,rgba(0,0,0,0.1) 4px)"}}/>
+          <div style={{position:"absolute",width:"100%",height:"15%",zIndex:21,pointerEvents:"none",background:"linear-gradient(transparent,rgba(255,255,255,0.02),transparent)",animation:"scanline 5s linear infinite"}}/>
+          <div style={{position:"absolute",inset:0,zIndex:15}}>
+            <BobSprite bob={activeBob} isSpeaking={speaking} isThinking={loading} isListening={isListening}/>
+          </div>
+          {reply&&!loading&&!liveText&&(
+            <button onClick={()=>speaking?stopSpeak():speak(reply,activeBob.id)} style={{position:"absolute",top:5,right:5,zIndex:30,background:"rgba(0,0,0,0.85)",border:`1px solid ${activeBob.color}`,color:activeBob.color,padding:"3px 7px",fontSize:7,cursor:"pointer",fontFamily:"'Press Start 2P',monospace"}}>
+              {speaking?"■ STOP":"▶ SPEAK"}
+            </button>
+          )}
+          <div style={{position:"absolute",bottom:5,left:6,zIndex:30,fontSize:6,color:"#2a4a2a",fontFamily:"'Press Start 2P',monospace",background:"rgba(0,0,0,0.7)",padding:"2px 5px"}}>
+            {msgs.length>0?`💾 ${msgs.length} msgs`:"💾 no memory"}
+          </div>
+        </div>
+
+        <div style={{padding:"8px 8px 4px",background:"#000"}}>
+          <DialogBox text={reply} bob={activeBob} isTyping={loading} liveTranscript={liveText}/>
+        </div>
+
+        {micError&&<div style={{background:"#1a0000",padding:"6px 10px",fontSize:7,color:"#ff6666",fontFamily:"'Press Start 2P',monospace"}}>⚠ {micError}</div>}
+
+        <div style={{background:"#050505",borderTop:"1px solid #111",borderBottom:"1px solid #111",padding:"5px 8px",display:"flex",gap:4,flexWrap:"wrap",minHeight:30,alignItems:"center"}}>
+          <span style={{fontSize:6,color:"#2a2a2a",marginRight:2}}>TOOLS:</span>
+          {activeTools.length===0
+            ?<span style={{fontSize:6,color:"#1e1e1e"}}>none — tap + to assign</span>
+            :activeTools.map(tid=>{const t=TOOL_REGISTRY.find(r=>r.id===tid);return t?(<div key={tid} style={{fontSize:9,padding:"2px 5px",background:`${activeBob.color}22`,border:`1px solid ${activeBob.color}44`,color:activeBob.color,display:"flex",alignItems:"center",gap:3}}>{t.icon}<span style={{fontSize:6}}>{t.name}</span></div>):null;})
+          }
+        </div>
+
+        {histOpen&&msgs.length>0&&(
+          <div style={{background:"#030303",borderBottom:"1px solid #111",maxHeight:130,overflowY:"auto",padding:"6px 10px"}}>
+            {msgs.map((m,i)=>(
+              <div key={i} style={{marginBottom:4,fontSize:7,lineHeight:1.9,color:m.role==="user"?"#555":activeBob.color}}>
+                <span style={{opacity:0.4}}>{m.role==="user"?"YOU":"BOB"}: </span>
+                {m.content.slice(0,100)}{m.content.length>100?"…":""}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{display:"flex",background:"#000",borderTop:"2px solid #1a1a1a",borderBottom:"2px solid #1a1a1a"}}>
+          {BOBS.map(bob=>(
+            <button key={bob.id} className="btab" onClick={()=>switchBob(bob)} style={{flex:1,padding:"6px 2px",background:bob.id===activeBob.id?`${bob.color}18`:"#000",border:"none",borderRight:"1px solid #1a1a1a",borderBottom:bob.id===activeBob.id?`2px solid ${bob.color}`:"2px solid transparent",color:bob.id===activeBob.id?bob.color:"#333",fontSize:7,fontFamily:"'Press Start 2P',monospace",cursor:"pointer"}}>
+              <div style={{fontSize:16,marginBottom:2}}>{bob.icon}</div>
+              <div>{bob.name}</div>
+              <div style={{fontSize:6,opacity:0.4,marginTop:1}}>{(conversations[bob.id]||[]).length}msg · {(bobTools[bob.id]||[]).length}🔧</div>
+            </button>
+          ))}
+        </div>
+
+        <div style={{background:"#000",padding:"8px 8px 6px",position:"relative"}}>
+          <div style={{display:"flex",gap:0,border:`2px solid ${activeBob.color}44`,background:"#050505"}}>
+            <input value={input} onChange={e=>setInput(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();doSend(input);}}}
+              placeholder={micOn&&!micMuted?"🎤 listening...":"TRANSMIT..."} disabled={loading||!ready}
+              style={{flex:1,background:"transparent",border:"none",color:"#ccc",fontSize:9,padding:"9px 10px",fontFamily:"'Press Start 2P',monospace",caretColor:activeBob.color}}/>
+            <button onClick={toggleMic} style={{background:micOn?`${micColor}22`:"#111",border:"none",borderLeft:`1px solid ${micColor}44`,color:micColor,width:60,height:"100%",fontSize:8,cursor:"pointer",fontFamily:"'Press Start 2P',monospace",animation:isListening?"micpulse 1.5s ease-in-out infinite":"none"}}>{micLabel}</button>
+            <div style={{position:"relative"}}>
+              <button onClick={()=>setToolPanel(p=>!p)} style={{background:toolPanel?`${activeBob.color}33`:"#111",border:"none",borderLeft:`1px solid ${activeBob.color}22`,color:activeBob.color,width:30,height:"100%",fontSize:16,cursor:"pointer"}}>+</button>
+              {toolPanel&&<ToolPanel bob={activeBob} activeTools={activeTools} onToggle={toggleTool} onClose={()=>setToolPanel(false)}/>}
+            </div>
+            <button onClick={()=>doSend(input)} disabled={loading||!input.trim()||!ready} style={{background:loading||!input.trim()?"#111":activeBob.color,color:loading||!input.trim()?"#333":"#000",border:"none",padding:"0 12px",fontSize:12,cursor:loading||!input.trim()?"not-allowed":"pointer",fontFamily:"'Press Start 2P',monospace",fontWeight:"bold"}}>
+              {loading?"·":"▶"}
+            </button>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:5,alignItems:"center"}}>
+            <div style={{fontSize:6,color:"#1a1a1a"}}>{micOn?(micMuted?"MUTED — tap 🎤 to resume":"VOICE ACTIVE — tap 🎤 to mute"):"ENTER=SEND · 🎤=VOICE"}</div>
+            <div style={{display:"flex",gap:6}}>
+              {msgs.length>0&&<button onClick={wipeMemory} style={{background:"none",border:"1px solid #2a0000",color:"#4a1111",fontSize:6,padding:"2px 6px",cursor:"pointer",fontFamily:"'Press Start 2P',monospace"}}>✕ WIPE</button>}
+              <button onClick={()=>setHistOpen(h=>!h)} style={{background:"none",border:"1px solid #1a1a1a",color:"#333",fontSize:6,padding:"2px 6px",cursor:"pointer",fontFamily:"'Press Start 2P',monospace"}}>{histOpen?"▲":"▼"} LOG ({msgs.length})</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{marginTop:8,fontSize:6,color:"#1a1a1a",letterSpacing:2}}>BOBIVERSE VR · PERSISTENT MEMORY · VOICE ENABLED</div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
